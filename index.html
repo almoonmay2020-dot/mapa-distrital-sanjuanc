@@ -183,10 +183,9 @@
         direccion: item.direccion || '',
         lat: item.lat,
         lng: item.lng,
-        iglesiaNombre: iglesia ? getChurchName(iglesia) : 'Universo',
+	iglesiaNombre: iglesia ? getChurchName(iglesia) : (iglesiasData[0] ? getChurchName(iglesiasData[0]) : 'Sin iglesia'),
         distancia: calcularDistanciaManhattan(iglesia?.lat, iglesia?.lng, item.lat, item.lng),
-        ultima_visita: item.ultima_visita || null
-      };
+        visita: item.visita || null
     });
 
     initChurchSelect();
@@ -376,8 +375,8 @@
 
       if (total > 1) {
         popupHTML += `<details open style="margin-top: 6px;"><summary style="cursor: pointer; color: #0f172a; font-weight: 600;">▼ Personas en esta dirección (${total})</summary><ul style="padding-left: 18px; margin-top: 6px; margin-bottom: 0;">${
-          punto.personas.map(p => `
-            <li style="margin-bottom: 6px;" title="Última visita: ${p.ultima_visita || 'Ninguna'}">
+	punto.personas.map(p => `
+            <li style="margin-bottom: 6px;" title="Última visita: ${p.visita || 'Ninguna'}">
               <strong>${p.nombre}</strong> (${p.grupo})<br>
               <small style="color: #475569;">Última visita: <b>${p.visita ? p.visita : 'Sin registrar'}</b></small><br>
               <button class="btn-visita" onclick="marcarVisita(${p.id}, event)">✅ Marcar Visita Hoy</button>
