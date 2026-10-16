@@ -186,6 +186,7 @@
 	iglesiaNombre: iglesia ? getChurchName(iglesia) : (iglesiasData[0] ? getChurchName(iglesiasData[0]) : 'Sin iglesia'),
         distancia: calcularDistanciaManhattan(iglesia?.lat, iglesia?.lng, item.lat, item.lng),
         visita: item.visita || null
+    };
     });
 
     initChurchSelect();
