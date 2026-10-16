@@ -1,0 +1,24 @@
+// Función para registrar la visita pastoral de forma limpia y sin conflictos
+  window.marcarVisita = async function(idMiembro, event) {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    
+    const { error } = await db.from('miembros').update({ ultima_visita: fechaHoy }).eq('id', idMiembro);
+    
+    if (error) {
+      alert("Error al actualizar la visita: " + error.message);
+      return;
+    }
+
+    const miembro = allData.find(m => m.id === idMiembro);
+    if (miembro) {
+      miembro.ultima_visita = fechaHoy;
+    }
+
+    update();
+    alert(`¡Visita registrada con éxito para ${miembro ? miembro.nombre : 'el miembro'} (${fechaHoy})!`);
+  };
