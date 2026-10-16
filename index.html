@@ -1,4 +1,325 @@
-// Función para registrar la visita pastoral de forma limpia y sin conflictos
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Membresía - Distrito</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; background-color: #0f172a; }
+    #loginOverlay { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 20px; }
+    .login-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 30px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,.5); color: #f8fafc; text-align: center; }
+    .login-card h2 { color: #38bdf8; margin-bottom: 8px; font-size: 20px; }
+    .login-card p { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+    .form-group { text-align: left; margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
+    .form-group input { width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 10px 12px; border-radius: 6px; font-size: 14px; }
+    .btn-login { width: 100%; background: #0284c7; color: white; border: 0; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .error-msg { color: #f87171; font-size: 12px; margin-top: 12px; display: none; }
+    .topbar { background-color: #1e293b; color: #ffffff; padding: 10px 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .brand-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #38bdf8; letter-spacing: 0.5px; padding-right: 12px; border-right: 1px solid #334155; }
+    .filter-group { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .filter-group label { font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; color: #94a3b8; }
+    .input-container { position: relative; display: flex; align-items: center; }
+    input[type="text"], select { background-color: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 7px 30px 7px 12px; border-radius: 6px; font-size: 13px; outline: none; transition: all 0.2s ease; }
+    input[type="text"]:focus, select:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
+    #clearSearch { position: absolute; right: 8px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 14px; display: none; padding: 2px; }
+    #clearSearch:hover { color: #f8fafc; }
+    .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: #1e293b; border: 1px solid #334155; border-radius: 6px; max-height: 220px; overflow-y: auto; z-index: 2000; margin-top: 4px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); display: none; }
+    .suggestion-item { padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid #334155; color: #e2e8f0; }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background-color: #334155; color: #38bdf8; }
+    .badge-counter { background-color: #0284c7; color: #ffffff; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; margin-left: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    #map { flex: 1; width: 100%; }
+    .leaflet-popup-content-wrapper { border-radius: 8px; padding: 4px; }
+    .popup-content { font-size: 13px; line-height: 1.5; color: #1e293b; min-width: 200px; }
+    .popup-address { font-weight: bold; font-size: 13px; margin-bottom: 6px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+    details { margin-top: 6px; }
+    summary { cursor: pointer; color: #0284c7; font-weight: bold; outline: none; font-size: 13px; }
+    summary:hover { color: #0369a1; }
+    ul { margin: 6px 0 0 16px; padding: 0; list-style-type: disc; }
+    li { margin-bottom: 6px; color: #334155; font-size: 12px; }
+    .legend-control { background: rgba(30, 41, 59, 0.95); color: #f8fafc; padding: 12px 14px; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.4); max-height: 280px; overflow-y: auto; font-size: 12px; }
+    .legend-title { font-weight: bold; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .legend-color { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #fff; flex-shrink: 0; }
+    .btn-visita { background-color: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 4px; font-weight: bold; }
+    .btn-visita:hover { background-color: #059669; }
+  </style>
+</head>
+<body>
+  <div id="loginOverlay">
+    <div class="login-card">
+      <h2>📌 Distrito Pastoral</h2>
+      <p>Acceso restringido a miembros autorizados.</p>
+      <form id="loginForm">
+        <div class="form-group"><label for="emailInput">Correo Electrónico:</label><input type="email" id="emailInput" required autocomplete="username" placeholder="correo@ejemplo.com"></div>
+        <div class="form-group"><label for="passwordInput">Contraseña:</label><input type="password" id="passwordInput" required autocomplete="current-password" placeholder="••••••••"></div>
+        <button type="submit" class="btn-login" id="btnLogin">Ingresar al Mapa</button>
+        <div id="errorMsg" class="error-msg" role="alert"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <div class="brand-title">
+      <span>📍</span>
+      <span id="brandTitleText">Mapa Distrital de Membresía</span>
+    </div>
+
+    <div class="filter-group">
+      <label>Iglesia:</label>
+      <select id="churchSelect">
+        <option value="">Todas las iglesias (Distrito)</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Grupo / Sede:</label>
+      <select id="groupSelect">
+        <option value="">Todos los grupos</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Buscar Persona:</label>
+      <div class="input-container">
+        <input type="text" id="searchInput" placeholder="Escribe un nombre..." autocomplete="off">
+        <button id="clearSearch" title="Borrar búsqueda">✕</button>
+        <div id="suggestions" class="suggestions-dropdown"></div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Vista de Mapa:</label>
+      <select id="tileSelect">
+        <option value="claro">Mapa Claro</option>
+        <option value="sat">Satelital (Esri)</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; color: #f8fafc; font-weight: normal; text-transform: none;">
+        <input type="checkbox" id="chkSedes" checked onchange="toggleSedes(this.checked)" style="cursor: pointer;">
+        <span>⛪ Mostrar Sedes</span>
+      </label>
+    </div>
+
+    <div class="badge-counter" id="counterBadge">
+      Mostrando: 0 registros
+    </div>
+  </div>
+  <div id="map"></div>
+
+<script>
+  const SUPABASE_URL = 'https://cpbgpugpmyqfuubwqtjv.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwYmdwdWdwbXlxZnV1YndxdGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5Njk5ODMsImV4cCI6MjEwNDU0NTk4M30.F1P_tI2tAFeImdvP6ehqM7Hx3hhlhjG8cuBYK4dPXEQ';
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let allData = [];
+  let iglesiasData = [];
+  let sedesData = [];
+
+  const getChurchName = i => i?.nombre_iglesia || '';
+  const validCoord = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
+
+  function matchesChurch(ref, church) {
+    if (ref === null || ref === undefined || ref === '' || !church) return false;
+    return String(ref) === String(church.id) || String(ref).trim().toLowerCase() === getChurchName(church).trim().toLowerCase();
+  }
+
+  function calcularDistanciaManhattan(lat1, lng1, lat2, lng2) {
+    if (![lat1, lng1, lat2, lng2].every(validCoord)) return 'N/A';
+    const dy = Math.abs(Number(lat1) - Number(lat2)) * 111139;
+    const dx = Math.abs(Number(lng1) - Number(lng2)) * 108630;
+    const distanciaTotal = dy + dx;
+    return distanciaTotal >= 1000 ? (distanciaTotal / 1000).toFixed(2) + " km" : Math.round(distanciaTotal) + " m";
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    const errorMsg = document.getElementById('errorMsg');
+    const btn = document.getElementById('btnLogin');
+    btn.disabled = true; btn.textContent = 'Iniciando sesión...'; errorMsg.style.display = 'none';
+    try {
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await fetchAppDataFromSupabase();
+      document.getElementById('loginOverlay').style.display = 'none';
+    } catch (err) {
+      errorMsg.textContent = 'No se pudo iniciar sesión o cargar los datos. ' + (err?.message || '');
+      errorMsg.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Ingresar al Mapa';
+    }
+  });
+
+  async function fetchAppDataFromSupabase() {
+    const [iglesiasRes, sedesRes, miembrosRes] = await Promise.all([
+      db.from('iglesias').select('*').order('id'),
+      db.from('sedes').select('*').order('id'),
+      db.from('miembros').select('*').order('id')
+    ]);
+    if (iglesiasRes.error) throw iglesiasRes.error;
+    if (sedesRes.error) throw sedesRes.error;
+    if (miembrosRes.error) throw miembrosRes.error;
+
+    iglesiasData = iglesiasRes.data || [];
+    sedesData = sedesRes.data || [];
+    const iglesiaDefault = iglesiasData[0] || null;
+
+    allData = (miembrosRes.data || []).map(item => {
+      const refIglesia = item.iglesia_id ?? item.id_iglesia ?? item.iglesia;
+      const iglesia = iglesiasData.find(i => matchesChurch(refIglesia, i)) || iglesiaDefault;
+      
+      return {
+        ...item,
+        nombre: item.nombre || '',
+        grupo: item.grupo || '',
+        direccion: item.direccion || '',
+        lat: item.lat,
+        lng: item.lng,
+        iglesiaNombre: iglesia ? getChurchName(iglesia) : 'Universo',
+        distancia: calcularDistanciaManhattan(iglesia?.lat, iglesia?.lng, item.lat, item.lng),
+        ultima_visita: item.ultima_visita || null
+      };
+    });
+
+    initChurchSelect();
+    actualizarSelectorGrupos();
+    renderChurches();
+    renderSedes();
+    updateLegend();
+    update();
+    if (!document.getElementById('chkSedes').checked) map.removeLayer(sedesLayer);
+  }
+
+  const churchSelect = document.getElementById('churchSelect');
+  const groupSelect = document.getElementById('groupSelect');
+
+  function initChurchSelect() {
+    churchSelect.innerHTML = '<option value="">Todas las iglesias (Distrito)</option>';
+    iglesiasData.forEach(i => {
+      const name = getChurchName(i);
+      if (!name) return;
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name; churchSelect.appendChild(opt);
+    });
+  }
+
+  function getGroupColor(nombreGrupo) {
+    const sedeEncontrada = sedesData.find(s => s.grupo && s.grupo.trim().toLowerCase() === String(nombreGrupo).trim().toLowerCase());
+    if (sedeEncontrada && sedeEncontrada.color) {
+      return sedeEncontrada.color;
+    }
+    return "#64748b";
+  }
+
+  function actualizarSelectorGrupos() {
+    const selectedChurchName = churchSelect.value;
+    groupSelect.innerHTML = '<option value="">Todos los grupos</option>';
+    
+    const optOcultar = document.createElement('option');
+    optOcultar.value = "NONE";
+    optOcultar.textContent = "🚫 Ocultar personas";
+    groupSelect.appendChild(optOcultar);
+
+    let gruposValidos = [];
+    if (selectedChurchName === "") {
+      gruposValidos = [...new Set(sedesData.map(s => s.grupo).filter(Boolean))].sort();
+    } else {
+      const church = iglesiasData.find(i => getChurchName(i) === selectedChurchName);
+      if (church) {
+        const sedesDeIglesia = sedesData.filter(s => matchesChurch(s.iglesia_id, church));
+        gruposValidos = [...new Set(sedesDeIglesia.map(s => s.grupo).filter(Boolean))].sort();
+      }
+    }
+
+    gruposValidos.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g;
+      opt.textContent = g;
+      groupSelect.appendChild(opt);
+    });
+  }
+
+  const map = L.map('map').setView([-12.186, -76.958], 15);
+
+  const claroLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    maxNativeZoom: 16, maxZoom: 19, attribution: 'Tiles &copy; Esri'
+  });
+
+  const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+    attribution: 'Tiles &copy; Esri' 
+  });
+
+  claroLayer.addTo(map);
+
+  document.getElementById('tileSelect').addEventListener('change', (e) => {
+    if (e.target.value === 'sat') {
+      map.removeLayer(claroLayer);
+      satLayer.addTo(map);
+    } else {
+      map.removeLayer(satLayer);
+      claroLayer.addTo(map);
+    }
+  });
+
+  const churchesLayer = L.layerGroup().addTo(map);
+  const sedesLayer = L.layerGroup().addTo(map);
+  let markersLayer = L.layerGroup().addTo(map);
+  let activeMarkersMap = {};
+
+  function renderChurches() {
+    churchesLayer.clearLayers();
+    const selectedChurch = churchSelect.value;
+    
+    const churchIcon = L.divIcon({
+      html: `<div style="font-size:26px; text-shadow: 0 0 5px #000; text-align:center;">⛪</div>`,
+      className: 'church-marker-icon', iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+
+    iglesiasData.forEach(igl => {
+      const nombreIgl = getChurchName(igl);
+      if ((selectedChurch === "" || selectedChurch === nombreIgl) && validCoord(igl.lat) && validCoord(igl.lng)) {
+        L.marker([Number(igl.lat), Number(igl.lng)], { icon: churchIcon, zIndexOffset: 1000 })
+          .bindPopup(`<div class="popup-content"><div class="popup-address" style="color: #0284c7;">⛪ IGLESIA ${nombreIgl.toUpperCase()}</div><div><strong>Dirección:</strong> ${igl.direccion || 'N/A'}</div></div>`)
+          .addTo(churchesLayer);
+      }
+    });
+  }
+
+  const sedeIcon = L.divIcon({
+    className: 'custom-sede-icon',
+    html: '<div style="background-color: #2563eb; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🏠</div>',
+    iconSize: [28, 28], iconAnchor: [14, 14]
+  });
+
+  function renderSedes() {
+    sedesLayer.clearLayers();
+    const selectedChurchName = churchSelect.value;
+    
+    sedesData.forEach(s => {
+      const church = iglesiasData.find(i => matchesChurch(s.iglesia_id, i));
+      const iglesiaNombreSede = church ? getChurchName(church) : '';
+
+      if ((selectedChurchName === "" || iglesiaNombreSede === selectedChurchName) && validCoord(s.lat) && validCoord(s.lng)) {
+        L.marker([Number(s.lat), Number(s.lng)], { icon: sedeIcon })
+          .bindPopup(`<div class="popup-content"><strong>📍 ${s.nombre}</strong><br><small>${s.direccion || ''}</small></div>`)
+          .addTo(sedesLayer);
+      }
+    });
+  }
+
+  function toggleSedes(visible) {
+    if (visible) map.addLayer(sedesLayer);
+    else map.removeLayer(sedesLayer);
+  }
+
   window.marcarVisita = async function(idMiembro, event) {
     if (event) {
       event.stopPropagation();
@@ -6,7 +327,6 @@
     }
 
     const fechaHoy = new Date().toISOString().split('T')[0];
-    
     const { error } = await db.from('miembros').update({ ultima_visita: fechaHoy }).eq('id', idMiembro);
     
     if (error) {
@@ -22,3 +342,201 @@
     update();
     alert(`¡Visita registrada con éxito para ${miembro ? miembro.nombre : 'el miembro'} (${fechaHoy})!`);
   };
+
+  function renderMap(filteredData) {
+    markersLayer.clearLayers();
+    activeMarkersMap = {};
+    document.getElementById('counterBadge').textContent = `Mostrando: ${filteredData.length} registro${filteredData.length === 1 ? '' : 's'}`;
+
+    const grouped = {};
+    filteredData.filter(p => validCoord(p.lat) && validCoord(p.lng)).forEach(p => {
+      p.lat = Number(p.lat); p.lng = Number(p.lng);
+      const key = `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
+      if(!grouped[key]) grouped[key] = { lat: p.lat, lng: p.lng, direccion: p.direccion, personas: [] };
+      grouped[key].personas.push(p);
+    });
+
+    Object.entries(grouped).forEach(([key, punto]) => {
+      const total = punto.personas.length;
+      const gruposEnPunto = [...new Set(punto.personas.map(p => p.grupo))];
+      let circleColor = gruposEnPunto.length === 1 ? getGroupColor(gruposEnPunto[0]) : "#64748b";
+
+      const radioDinamico = 8 + (total * 1.5);
+      const isWhite = circleColor.toLowerCase() === "#ffffff";
+
+      const marker = L.circleMarker([punto.lat, punto.lng], {
+        radius: radioDinamico, fillColor: circleColor,
+        color: isWhite ? "#0f172a" : "#ffffff", weight: isWhite ? 3 : 2,
+        opacity: 1, fillOpacity: 0.95
+      });
+
+      const distanciaPunto = punto.personas[0].distancia || 'N/A';
+      let popupHTML = `<div class="popup-content"><div class="popup-address">📍 ${punto.direccion}</div><div style="color: #0284c7; font-size: 0.85em; font-weight: 600; margin-top: 2px; margin-bottom: 8px;">📏 Distancia a la Iglesia: ${distanciaPunto}</div>`;
+
+      if (total > 1) {
+        popupHTML += `<details open style="margin-top: 6px;"><summary style="cursor: pointer; color: #0f172a; font-weight: 600;">▼ Personas en esta dirección (${total})</summary><ul style="padding-left: 18px; margin-top: 6px; margin-bottom: 0;">${
+          punto.personas.map(p => `
+            <li style="margin-bottom: 6px;" title="Última visita: ${p.ultima_visita || 'Ninguna'}">
+              <strong>${p.nombre}</strong> (${p.grupo})<br>
+              <small style="color: #475569;">Última visita: <b>${p.ultima_visita ? p.ultima_visita : 'Sin registrar'}</b></small><br>
+              <button class="btn-visita" onclick="marcarVisita(${p.id}, event)">✅ Marcar Visita Hoy</button>
+            </li>
+          `).join('')
+        }</ul></details>`;
+      } else {
+        const p = punto.personas[0];
+        popupHTML += `
+          <div style="margin-top:4px;"><strong>Persona:</strong> ${p.nombre}</div>
+          <div style="margin-top:2px;"><strong>Grupo:</strong> ${p.grupo}</div>
+          <div style="margin-top:2px; color: #475569;"><strong>Última visita:</strong> <b>${p.ultima_visita ? p.ultima_visita : 'Sin registrar'}</b></div>
+          <button class="btn-visita" onclick="marcarVisita(${p.id}, event)">✅ Marcar Visita Hoy</button>
+        `;
+      }
+
+      popupHTML += `</div>`;
+      marker.bindPopup(popupHTML);
+      marker.addTo(markersLayer);
+      activeMarkersMap[key] = marker;
+    });
+
+    if (filteredData.length > 0) {
+      const bounds = L.latLngBounds(filteredData.map(p => [p.lat, p.lng]));
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+    }
+  }
+
+  function getFilteredData() {
+    const selectedChurch = churchSelect.value;
+    const selectedGroup = groupSelect.value;
+    if (selectedGroup === "NONE") return [];
+
+    const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+    return allData.filter(item => {
+      const matchChurch = selectedChurch === "" || item.iglesiaNombre === selectedChurch;
+      const matchGroup = selectedGroup === "" || item.grupo === selectedGroup;
+      const matchName = String(item.nombre || '').toLowerCase().includes(searchText);
+      return matchChurch && matchGroup && matchName;
+    });
+  }
+
+  const legend = L.control({ position: 'bottomleft' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'legend-control');
+    div.id = 'legendContent';
+    return div;
+  };
+  legend.addTo(map);
+
+  function updateLegend() {
+    const legendContent = document.getElementById('legendContent');
+    if (!legendContent) return;
+
+    const selectedChurchName = churchSelect.value;
+    let html = `<div class="legend-title">Leyenda de Grupos</div><div class="legend-item"><span style="font-size:14px;">⛪</span> <strong>Iglesias / Sedes</strong></div>`;
+
+    let sedesAMostrar = sedesData;
+    if (selectedChurchName !== "") {
+      const church = iglesiasData.find(i => getChurchName(i) === selectedChurchName);
+      if (church) {
+        sedesAMostrar = sedesData.filter(s => matchesChurch(s.iglesia_id, church));
+      }
+    }
+
+    const gruposUnicos = {};
+    sedesAMostrar.forEach(s => {
+      if (s.grupo && !gruposUnicos[s.grupo]) {
+        gruposUnicos[s.grupo] = s.color || "#64748b";
+      }
+    });
+
+    Object.entries(gruposUnicos).forEach(([grupo, colorGrupo]) => {
+      html += `
+        <div class="legend-item">
+          <span class="legend-color" style="background-color: ${colorGrupo}; ${String(colorGrupo).toLowerCase() === '#ffffff' ? 'border:1.5px solid #000;' : ''}"></span>
+          <span>${grupo}</span>
+        </div>
+      `;
+    });
+
+    legendContent.innerHTML = html;
+  }
+
+  function update() {
+    renderChurches();
+    renderSedes();
+    updateLegend();
+    renderMap(getFilteredData());
+  }
+
+  churchSelect.addEventListener('change', () => {
+    actualizarSelectorGrupos();
+    document.getElementById('searchInput').value = '';
+    document.getElementById('clearSearch').style.display = 'none';
+    
+    const titleText = churchSelect.value === "" ? "Mapa Distrital de Membresía" : `Mapa de Membresía - Iglesia ${churchSelect.value}`;
+    document.getElementById('brandTitleText').textContent = titleText;
+    
+    update();
+  });
+
+  groupSelect.addEventListener('change', update);
+
+  const searchInput = document.getElementById('searchInput');
+  const clearSearchBtn = document.getElementById('clearSearch');
+  const suggestionsBox = document.getElementById('suggestions');
+
+  searchInput.addEventListener('input', () => {
+    const val = searchInput.value.toLowerCase().trim();
+    clearSearchBtn.style.display = val.length > 0 ? 'block' : 'none';
+    suggestionsBox.innerHTML = '';
+    
+    if (val.length === 0) { 
+      suggestionsBox.style.display = 'none'; 
+      update(); 
+      return; 
+    }
+
+    const selectedChurch = churchSelect.value;
+    const matches = allData.filter(d => {
+      const matchC = selectedChurch === "" || d.iglesiaNombre === selectedChurch;
+      return matchC && d.nombre.toLowerCase().includes(val);
+    }).slice(0, 8);
+
+    if (matches.length > 0) {
+      matches.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.innerHTML = `<strong>${item.nombre}</strong> (${item.grupo} - ${item.iglesiaNombre}) - <span style="color:#94a3b8;">${item.direccion}</span>`;
+        div.addEventListener('click', () => {
+          searchInput.value = item.nombre;
+          clearSearchBtn.style.display = 'block';
+          suggestionsBox.style.display = 'none';
+          update();
+          const key = `${item.lat.toFixed(6)},${item.lng.toFixed(6)}`;
+          map.setView([item.lat, item.lng], 18);
+          if (activeMarkersMap[key]) activeMarkersMap[key].openPopup();
+        });
+        suggestionsBox.appendChild(div);
+      });
+      suggestionsBox.style.display = 'block';
+    } else { 
+      suggestionsBox.style.display = 'none'; 
+    }
+    update();
+  });
+
+  clearSearchBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    clearSearchBtn.style.display = 'none';
+    suggestionsBox.style.display = 'none';
+    update();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target) && !clearSearchBtn.contains(e.target)) {
+      suggestionsBox.style.display = 'none';
+    }
+  });
+</script>
+</body>
+</html>
