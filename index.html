@@ -183,10 +183,10 @@
         direccion: item.direccion || '',
         lat: item.lat,
         lng: item.lng,
-	iglesiaNombre: iglesia ? getChurchName(iglesia) : (iglesiasData[0] ? getChurchName(iglesiasData[0]) : 'Sin iglesia'),
+        iglesiaNombre: iglesia ? getChurchName(iglesia) : (iglesiasData[0] ? getChurchName(iglesiasData[0]) : 'Sin iglesia'),
         distancia: calcularDistanciaManhattan(iglesia?.lat, iglesia?.lng, item.lat, item.lng),
         visita: item.visita || null
-    };
+      };
     });
 
     initChurchSelect();
@@ -320,7 +320,7 @@
     else map.removeLayer(sedesLayer);
   }
 
-// Función para registrar la visita pastoral usando el campo "visita"
+  // Función para registrar la visita pastoral usando el campo "visita"
   window.marcarVisita = async function(idMiembro, event) {
     if (event) {
       event.stopPropagation();
@@ -376,7 +376,7 @@
 
       if (total > 1) {
         popupHTML += `<details open style="margin-top: 6px;"><summary style="cursor: pointer; color: #0f172a; font-weight: 600;">▼ Personas en esta dirección (${total})</summary><ul style="padding-left: 18px; margin-top: 6px; margin-bottom: 0;">${
-	punto.personas.map(p => `
+          punto.personas.map(p => `
             <li style="margin-bottom: 6px;" title="Última visita: ${p.visita || 'Ninguna'}">
               <strong>${p.nombre}</strong> (${p.grupo})<br>
               <small style="color: #475569;">Última visita: <b>${p.visita ? p.visita : 'Sin registrar'}</b></small><br>
