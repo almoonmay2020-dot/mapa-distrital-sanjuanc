@@ -320,14 +320,15 @@
     else map.removeLayer(sedesLayer);
   }
 
+// Función para registrar la visita pastoral usando el campo "visita"
   window.marcarVisita = async function(idMiembro, event) {
     if (event) {
       event.stopPropagation();
       event.preventDefault();
     }
 
-    const fechaHoy = new Date().toISOString().split('T')[0];
-    const { error } = await db.from('miembros').update({ ultima_visita: fechaHoy }).eq('id', idMiembro);
+    const fechaHoy = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    const { error } = await db.from('miembros').update({ visita: fechaHoy }).eq('id', idMiembro);
     
     if (error) {
       alert("Error al actualizar la visita: " + error.message);
@@ -336,7 +337,7 @@
 
     const miembro = allData.find(m => m.id === idMiembro);
     if (miembro) {
-      miembro.ultima_visita = fechaHoy;
+      miembro.visita = fechaHoy;
     }
 
     update();
@@ -378,7 +379,7 @@
           punto.personas.map(p => `
             <li style="margin-bottom: 6px;" title="Última visita: ${p.ultima_visita || 'Ninguna'}">
               <strong>${p.nombre}</strong> (${p.grupo})<br>
-              <small style="color: #475569;">Última visita: <b>${p.ultima_visita ? p.ultima_visita : 'Sin registrar'}</b></small><br>
+              <small style="color: #475569;">Última visita: <b>${p.visita ? p.visita : 'Sin registrar'}</b></small><br>
               <button class="btn-visita" onclick="marcarVisita(${p.id}, event)">✅ Marcar Visita Hoy</button>
             </li>
           `).join('')
@@ -388,7 +389,7 @@
         popupHTML += `
           <div style="margin-top:4px;"><strong>Persona:</strong> ${p.nombre}</div>
           <div style="margin-top:2px;"><strong>Grupo:</strong> ${p.grupo}</div>
-          <div style="margin-top:2px; color: #475569;"><strong>Última visita:</strong> <b>${p.ultima_visita ? p.ultima_visita : 'Sin registrar'}</b></div>
+          <div style="margin-top:2px; color: #475569;"><strong>Última visita:</strong> <b>${p.visita ? p.visita : 'Sin registrar'}</b></div>
           <button class="btn-visita" onclick="marcarVisita(${p.id}, event)">✅ Marcar Visita Hoy</button>
         `;
       }
